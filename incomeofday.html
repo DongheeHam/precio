@@ -28,7 +28,7 @@
     <script>
         // 한국수출입은행 api키 5gctN1ILEdvWKyo346cEErGbip6it8PU
         // https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=5gctN1ILEdvWKyo346cEErGbip6it8PU&searchdate=20210102&data=AP01
-
+        // 도큐먼트 : https://www.koreaexim.go.kr/site/program/openapi/openApiView?menuid=001003002002001&apino=2&viewtype=C
         var 환율 = {
             
         }
@@ -84,6 +84,7 @@
 sales_result=[]
 date_data={}
 invalidMemo=[]
+발주번호={}
 function addResult(json,store){console.log(json,store)
     for (var i = 0 ; i < json.length ; i++) {
         var row=json[i];
