@@ -1,0 +1,579 @@
+<html>
+<head>
+
+	<script type="text/javascript" src="https://code.jquery.com/jquery-1.11.3.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+	<script type="text/javascript" src="https://gsl.sysoit.com/class/res/tableExport/libs/FileSaver/FileSaver.min.js"></script>
+	<script type="text/javascript" src="./xlsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" ></script>
+    <style>
+        td{white-space: nowrap;}
+        th{white-space: nowrap;}
+    </style>
+</head>
+<body>
+    <div class="info">
+        시트업로드
+    </div>
+    <div>
+        <div>
+            <input type="file"id="excel-file" class="excel-file" name="excel">
+        </div>
+    </div><hr>
+    <div id="current-container">
+        <div>결과 시트 <span class="download-container"></span></div>
+        <table id="result-table" border="1"> </table>
+    </div>
+    <script>
+        // 한국수출입은행 api키 5gctN1ILEdvWKyo346cEErGbip6it8PU
+        // https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=5gctN1ILEdvWKyo346cEErGbip6it8PU&searchdate=20210102&data=AP01
+
+        var 환율 = {
+            
+        }
+        $("#excel-file").on("change", function(event){
+            event.preventDefault(); // 기본효과를 막음
+            
+            fileupload(event,"sales");
+        });
+        var EXCEL_JSON;
+        function fileupload(e,store){
+
+            var files = e.target.files; //input file 객체를 가져온다.
+            var i,f;
+            for (i = 0; i != files.length; ++i) {
+                f = files[i];
+                var reader = new FileReader(); //FileReader를 생성한다.         
+                
+                //성공적으로 읽기 동작이 완료된 경우 실행되는 이벤트 핸들러를 설정한다.
+                reader.onload = function(e) {
+                    var data = e.target.result; //FileReader 결과 데이터(컨텐츠)를 가져온다.
+ 
+                    //바이너리 형태로 엑셀파일을 읽는다.
+                    var workbook = XLSX.read(data, {type: 'binary'});
+                    
+                    //엑셀파일의 시트 정보를 읽어서 JSON 형태로 변환한다.
+                    workbook.SheetNames.forEach(function(item, index, array) {
+                        EXCEL_JSON = XLSX.utils.sheet_to_json(workbook.Sheets[item]);
+                        drowCurrent(EXCEL_JSON,store)
+                    });//end. forEach
+                }; 
+                
+                //파일객체를 읽는다. 완료되면 원시 이진 데이터가 문자열로 포함됨.
+                reader.readAsBinaryString(f);
+            
+            }//end. for
+        }
+        function drowCurrent(json,store){
+            console.log("drowCurrent json:",json)
+            // current 그리기
+            buildHtmlTable(store+"-current-table",json,true);
+
+            // result data 생성
+            addResult(json,store);
+
+            // result 그리기
+
+        }
+        function drowResult(){
+            
+        }
+sales_result=[]
+date_data={}
+invalidMemo=[]
+function addResult(json,store){console.log(json,store)
+    for (var i = 0 ; i < json.length ; i++) {
+        var row=json[i];
+        console.log("row:",row)
+        
+        // 취소 환불건 처리
+        if(
+            row["주문상태"]=="주문재확인" ||
+            row["주문상태"]=="반품완료" ||
+            row["주문상태"]=="취소완료" 
+        )continue;
+
+        // => 주문수량 0인경우 건너뛰기
+        if(row["주문수량"]==0) continue;
+        console.log("getProductType(row[쇼핑몰상품코드]):",getProductType(row["쇼핑몰상품코드"]))
+        // 구매대행이 아닌 경우 건거뛰기
+        if(getProductType(row["쇼핑몰상품코드"])!="구매대행") continue;
+        console.log(111)
+        var newRow={
+            "주문플랫폼":row["쇼핑몰"],
+            "주문일자":row["결제완료일"],
+            "국내오더넘버":row["쇼핑몰주문번호"],
+            "업체상품코드":row["쇼핑몰상품코드"],
+            "품목":"", //밑에서 채움
+            "옵션":row["옵션"],
+            "수량":row["주문수량"],
+            "구매자":row["주문자명"],
+            "구매자연락처":row["주문자전화번호"],
+            "수취인":row["수령자명"],
+            "수취인연락처":row["수령자휴대폰번호"],
+            "주소":row["주소"],
+            "우편번호":row["우편번호"],
+            "메시지":row["배송메세지"],
+            "개인통관번호":row["개인통관번호"],
+            "상품결제금액":row["금액"],
+            "고객결제배송비":row["배송비"],
+            "택배사":row["택배사"],
+            "운송장번호":row["운송장번호"],
+            "정산금액":0,
+            "발주일자":"",
+            "해외구매처":row["매입처"],
+            "해외오더넘버":"",
+            "결제카드":"",
+            "배송대행지":"",
+            "국제배송비":0,
+            "일괄발주여부":"",
+            "해외화폐(달러)":0,
+            "해외화폐(위안)":0,
+        }
+
+        // 상품명 간략화 처리
+        var productName=findProductName(row["쇼핑몰상품코드"]);
+        newRow["품목"]=productName;
+        
+        // 정산 금액 계산
+        if(row["쇼핑몰"]=="스마트스토어"){
+            newRow["정산금액"]=row["공급가"];
+        }else{
+            var fee=getProductFee(row["쇼핑몰상품코드"],row["쇼핑몰"]);
+            console.log("fee:",fee);
+            var pay=Number(row["금액"]);
+            newRow["정산금액"]=Math.floor(pay-(pay*fee/100));
+        }
+
+        // 메모 => 구매대행정보 변환
+        var memo=row["메모"];
+        console.log("memo:"+memo);
+        var memoS=memo.split("/");
+        if(memoS.length!=3){
+            var 해외오더넘버=memo;
+            newRow["해외오더넘버"]=해외오더넘버;
+            invalidMemo.push({current:i,result:sales_result.length});
+            
+        }else{
+            var 해외오더넘버=memoS[0].trim();
+            var 발주일자=memoS[1].trim(); //YYYYMMDDHHmm
+            발주일자=발주일자.replace(/[^\d.]/g, '');
+            var 구매금액=Number(memoS[2].trim());
+
+            newRow["발주일자"]=발주일자;
+            newRow["해외오더넘버"]=해외오더넘버;
+            newRow["결제카드"]="";
+            newRow["배송대행지"]=getShippingAgency(row["매입처"]);
+
+            // 달러면 달러컬럼에, 위안화면 위안화컬럼에 추가
+            var paymentCurrency=getPaymentCurrency(row["매입처"]);
+            if(paymentCurrency=="달러"){
+                newRow["해외화폐(달러)"]=구매금액;
+            }else if(paymentCurrency=="위안"){
+                newRow["해외화폐(위안)"]=구매금액;
+            }
+
+            // 동일주문 체크를 위한 발주번호 키 정리
+            
+            if(발주번호[해외오더넘버]!=null){
+                newRow["일괄발주여부"]="일괄발주";
+                발주번호[해외오더넘버].push(sales_result.length)
+                newRow["해외화폐(위안)"]=0
+                newRow["해외화폐(달러)"]=0
+                newRow["국제배송비"]=0;
+
+                sales_result[발주번호[해외오더넘버][0]]["일괄발주여부"]="일괄발주";
+            }else{
+                발주번호[해외오더넘버]=[sales_result.length]
+            }
+
+            // 국제배송비
+            if(productName=="전기종 짱구케이스" || productName=="A시리즈 짱구케이스"){
+                newRow["국제배송비"]=4500
+            }
+        }
+
+        console.log("newRow:",newRow)
+        sales_result.push(newRow);
+    }
+
+    // 발주번호 미중복 주문건 삭제 (일괄결제건만 남기고 삭제)
+    // 모든 키 정리표로 쓸 수도 있으니 안하는게 나을듯
+    // for(var i=0;i>Object.keys(발주번호).length;i++){
+    //     var Object.keys(발주번호)
+    // }
+
+    buildHtmlTable("sales-result-table",sales_result,true);
+
+    // 메모이상건 있으면 alert
+    if(invalidMemo.length!=0){
+        alert("메모가 형식에 맞지 않는 주문건이 있습니다. 노란 배경컬럼 확인 후 처리 바랍니다.");
+        for(var i=0;i<invalidMemo.length;i++){
+            $($('#sales-current-table').find('tr')[invalidMemo[i].current+1]).css('background','#ffff00')
+            $($('#sales-result-table').find('tr')[invalidMemo[i].result+1]).css('background','#ffff00')
+        }
+    }
+
+    $('.download-container').html('<button onclick="download()">결과시트 다운로드</button>')
+}
+
+// Builds the HTML Table out of myList json data from Ivy restful service.
+ function buildHtmlTable(id,json,isDrowHeader) {
+     var columns = addAllColumnHeaders(id,json,isDrowHeader);
+ 
+     for (var i = 0 ; i < json.length ; i++) {
+         var row$ = $('<tr/>');
+         for (var colIndex = 0 ; colIndex < columns.length ; colIndex++) {
+             var cellValue = json[i][columns[colIndex]];
+ 
+             if (cellValue == null) { cellValue = ""; }
+             
+             row$.append($('<td/>').html(cellValue));
+         }
+         $("#"+id).append(row$);
+     }
+ }
+
+ 
+ // Adds a header row to the table and returns the set of columns.
+ // Need to do union of keys from all records as some records may not contain
+ // all records
+ function addAllColumnHeaders(id,json,isDrowHeader)
+ {
+     
+     var columnSet = [];
+     var headerTr$ = $('<tr/>');
+ 
+     for (var i = 0 ; i < json.length ; i++) {
+         var rowHash = json[i];
+         for (var key in rowHash) {
+             if ($.inArray(key, columnSet) == -1){
+                 columnSet.push(key);
+                 isDrowHeader && headerTr$.append($('<th/>').html(key));
+             }
+         }
+     }
+     isDrowHeader && $("#"+id).append(headerTr$);
+     //console.log("columnSet:",columnSet)
+     return columnSet;
+ }
+ function download(tp){
+    // var workSheet;
+    // var filename;
+    // var wb = XLSX.utils.book_new();
+    // if(tp=="on"){
+    //     workSheet = XLSX.utils.json_to_sheet(on_result);
+    //     filename=moment().format('YYYY-MM-DD 온채널주문서');
+    //     XLSX.utils.book_append_sheet(wb, workSheet, 'sheet1');
+    //     XLSX.writeFile(wb, filename+'.xls');
+    // }else if(tp=="my"){
+    //     workSheet = XLSX.utils.json_to_sheet(my_result);
+    //     filename=moment().format('프레시오_YYYYMMDD');
+    //     XLSX.utils.book_append_sheet(wb, workSheet, 'sheet1');
+    //     XLSX.writeFile(wb, filename+'.xls');
+    // }
+    var workbook = new ExcelJS.Workbook();
+    var atcAoaData=[];
+    var atcSheet =  workbook.addWorksheet('결과시트', {
+		pageSetup:{
+			paperSize: 9, 
+			orientation:'landscape',
+			horizontalCentered:true,
+			verticalCentered:true,
+			fitToPage:true
+		},
+		headerFooter:{firstHeader: '결과시트'},
+	});
+
+    var header=Object.keys(sales_result[0]);
+
+    atcAoaData.push(header);
+
+    for(var i=0;i<sales_result.length;i++){
+        var row=[]
+        for(var j=0;j<header.length;j++){
+            row.push(sales_result[i][header[j]]);
+        }
+        console.log("row:",row);
+        atcAoaData.push(row);
+    }
+    atcSheet.addRows(atcAoaData);
+
+    // 글씨크기 변경
+    for (var i = 1; i <= atcSheet.actualRowCount; i++) {
+        for (var j = 1; j <= atcSheet.actualColumnCount; j++) {
+            atcSheet.getRow(i).getCell(j).font= {
+                    size:8,
+                };
+        }
+        console.log()
+    }
+
+    lastColor="FF00FF00"
+    for(var i=0;i<Object.keys(발주번호).length;i++){
+        var mergeList=발주번호[Object.keys(발주번호)[i]]
+        console.log("mergeList:",mergeList)
+        if(mergeList.length>1){
+
+            //atcSheet.mergeCells(mergeList[0]+2, 27,mergeList[mergeList.length-1]+2,27);
+            var fontcolor;
+            if(lastColor=="FF00FF00") fontcolor="FF0000FF"
+            else fontcolor="FF00FF00"
+            lastColor=fontcolor
+            for(var j=0;j<mergeList.length;j++){
+                atcSheet.getRow(mergeList[j]+2).getCell(27).font= {
+                    color: { argb: fontcolor},
+                };
+            }
+        }
+    }
+
+    workbook.xlsx.writeBuffer()
+    .then(function(buffer){saveAs$$module$FileSaver(new Blob([buffer]), "결과시트" + (new Date()).toISOString().substring(0,10)+".xlsx")})
+	.catch(function(err){console.log('Error writing excel export', err)})
+
+ }
+ function s2ab(s) {
+    var buf = new ArrayBuffer(s.length);
+    var view = new Uint8Array(buf);
+    for ( var i=0; i != s.length; ++i ) view[ i ] = s.charCodeAt( i ) & 0xFF;
+    return buf;
+  }
+  
+// const mallProductCode={
+//     "N 도어잠금커버":['12828779715','5783006936'],
+//     "N 목쿠션":["12828779717",'5785531103'],
+//     "N LED컵홀더":["12828779717",'5808226980'],
+//     "N 벨트커버":["12828779727","5781215842"],
+//     "N 가죽키링":["12828779759","5785677012"],
+//     "N 가죽각인키링":["5785656301"],
+//     "N 고리형 키링":["5786280114"],
+//     "N 도어라이트":["12828779813","5788371143"],
+//     "N 앞유리스티커":["5781154026"],
+//     "N 무릎쿠션":["5783126882"],
+//     "N 헤드레스트":["5783893434"],
+
+//     "전기종 짱구케이스":["12828781583","5804499491"],
+//     "A시리즈 짱구케이스":["12828779807","5804576431"],
+//     "짱구스티커":["5839914887"],
+
+//     "버킷돌리":['2331466628','6043141454','8839868375'],
+//     "버킷돌리(세트)":['12978387331'],
+//     "버킷돌리(추가상품)":["6131658967"],
+//     "악력기":["13021910128"],
+// }
+const mallProductCode={
+    "N 도어잠금커버":{
+        product:['12828779715','5783006936'],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 목쿠션":{
+        product:["12828779717",'5785531103'],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N LED컵홀더":{
+        product:["12828779720",'5808226980'],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 벨트커버":{
+        product:["12828779727","5781215842"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 가죽키링":{
+        product:["12828779759","5785677012"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 가죽각인키링":{
+        product:["5785656301"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 고리형 키링":{
+        product:["5786280114"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 도어라이트":{
+        product:["12828779813","5788371143"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 앞유리스티커":{
+        product:["5781154026"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 무릎쿠션":{
+        product:["5783126882"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+    "N 헤드레스트":{
+        product:["5783893434"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"구매대행"
+    },
+
+    "전기종 짱구케이스":{
+        product:["12828781583","5804499491"],
+        fee:{
+            "쿠팡":8.6,
+        },
+        type:"구매대행"
+    },
+    "A시리즈 짱구케이스":{
+        product:["12828779807","5804576431"],
+        fee:{
+            "쿠팡":8.6,
+        },
+        type:"구매대행"
+    },
+    "짱구스티커":{
+        product:["5839914887"],
+        fee:{
+            "쿠팡":11,
+        },
+        type:"사입"
+    },
+
+    "버킷돌리":{
+        product:['2331466628','6043141454','8839868375'],
+        fee:{
+            "쿠팡":11,
+            "11번가":13,
+            "티몬":14,
+            "위메프":4,
+            "지마켓":13,
+            "옥션":13,
+            "인터파크":13,
+            "롯데ON":13,
+        },
+        type:"사입"
+    },
+    "버킷돌리(세트)":{
+        product:['12978387331'],
+        fee:{
+            "쿠팡":11,
+            "11번가":13,
+            "티몬":14,
+            "위메프":4,
+            "지마켓":13,
+            "옥션":13,
+            "인터파크":13,
+            "롯데ON":13,
+        },
+        type:"사입"
+    },
+    "버킷돌리(추가상품)":{
+        product:["6131658967"],
+        fee:{
+            "쿠팡":11,
+            "11번가":13,
+            "티몬":14,
+            "위메프":4,
+            "지마켓":13,
+            "옥션":13,
+            "인터파크":13,
+            "롯데ON":13,
+        },
+        type:"사입"
+    },
+    "악력기":{
+        product:["13021910128"],
+        fee:{
+            "쿠팡":11.9,
+        },
+        type:"위탁판매"
+    },
+}
+
+// 결제화페 수단
+function getPaymentCurrency(해외구매처){
+    if(해외구매처=="알리익스프레스"){
+        return "달러";
+    }else if(해외구매처=="타오바오"){
+        return "위안";
+    }else{
+        return null;
+    }
+}
+
+// 배송대행지
+function getShippingAgency(해외구매처){
+    if(해외구매처=="알리익스프레스"){
+        return "-";
+    }else if(해외구매처=="타오바오"){
+        return "토스토스";
+    }else{
+        return null;
+    }
+}
+
+// 상품명
+function findProductName(code){
+    for(var i=0;i<Object.keys(mallProductCode).length;i++){
+        var p=mallProductCode[Object.keys(mallProductCode)[i]]
+        for(var j=0;j<p.product.length;j++){
+            if(code==p.product[j]){
+                return Object.keys(mallProductCode)[i]
+            }
+        }
+    }
+    return null;
+}
+
+// 수수료
+function getProductFee(code,store){
+    for(var i=0;i<Object.keys(mallProductCode).length;i++){
+        var p=mallProductCode[Object.keys(mallProductCode)[i]]
+        for(var j=0;j<p.product.length;j++){
+            if(code==p.product[j]){
+                return mallProductCode[Object.keys(mallProductCode)[i]].fee[store]
+            }
+        }
+    }
+    return 13;
+}
+
+// 판매구분
+function getProductType(code){
+    for(var i=0;i<Object.keys(mallProductCode).length;i++){
+        var p=mallProductCode[Object.keys(mallProductCode)[i]]
+        for(var j=0;j<p.product.length;j++){
+            if(code==p.product[j]){
+                return mallProductCode[Object.keys(mallProductCode)[i]].type
+            }
+        }
+    }
+    return 13;
+}
+    </script>
+</body>
+</html>
