@@ -10,6 +10,7 @@
         td{white-space: nowrap;}
         th{white-space: nowrap;}
     </style>
+	<title>1</title>
 </head>
 <body>
     <div class="info">
@@ -73,10 +74,12 @@
             addResult(json,store);
 
             // result 그리기
-
+            setDateData()
         }
-        function drowResult(){
-            
+        function setDateData(){
+            for (var i = 0 ; i < sales_result.length ; i++) {
+
+            }
         }
 sales_result=[]
 date_data={}
@@ -95,10 +98,7 @@ function addResult(json,store){console.log(json,store)
 
         // => 주문수량 0인경우 건너뛰기
         if(row["주문수량"]==0) continue;
-        console.log("getProductType(row[쇼핑몰상품코드]):",getProductType(row["쇼핑몰상품코드"]))
-        // 구매대행이 아닌 경우 건거뛰기
-        if(getProductType(row["쇼핑몰상품코드"])!="구매대행") continue;
-        console.log(111)
+        
         var newRow={
             "주문플랫폼":row["쇼핑몰"],
             "주문일자":row["결제완료일"],
@@ -108,22 +108,13 @@ function addResult(json,store){console.log(json,store)
             "옵션":row["옵션"],
             "수량":row["주문수량"],
             "구매자":row["주문자명"],
-            "구매자연락처":row["주문자전화번호"],
-            "수취인":row["수령자명"],
-            "수취인연락처":row["수령자휴대폰번호"],
-            "주소":row["주소"],
-            "우편번호":row["우편번호"],
-            "메시지":row["배송메세지"],
             "개인통관번호":row["개인통관번호"],
             "상품결제금액":row["금액"],
             "고객결제배송비":row["배송비"],
-            "택배사":row["택배사"],
-            "운송장번호":row["운송장번호"],
             "정산금액":0,
             "발주일자":"",
             "해외구매처":row["매입처"],
             "해외오더넘버":"",
-            "결제카드":"",
             "배송대행지":"",
             "국제배송비":0,
             "일괄발주여부":"",
@@ -162,8 +153,18 @@ function addResult(json,store){console.log(json,store)
 
             newRow["발주일자"]=발주일자;
             newRow["해외오더넘버"]=해외오더넘버;
-            newRow["결제카드"]="";
             newRow["배송대행지"]=getShippingAgency(row["매입처"]);
+
+            // 해당 발주일의 환율값이 없다면 가져다놓기
+            var date=moment(발주일자).format('YYYYMMDD')
+            if(환율[date]==null){
+                $.post('https://www.koreaexim.go.kr/site/program/financial/exchangeJSON',
+                    {authkey:"5gctN1ILEdvWKyo346cEErGbip6it8PU",searchdate:date,data:"AP01"},
+                    function(res){
+                        환율[date]=res;
+                    })
+                }
+            }
 
             // 달러면 달러컬럼에, 위안화면 위안화컬럼에 추가
             var paymentCurrency=getPaymentCurrency(row["매입처"]);
