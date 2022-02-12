@@ -21,10 +21,29 @@
             <input type="file"id="excel-file" class="excel-file" name="excel">
         </div>
     </div><hr>
-    <div id="current-container">
+    <!-- <div id="current-container">
         <div>결과 시트 <span class="download-container"></span></div>
         <table id="result-table" border="1"> </table>
-    </div>
+    </div> -->
+    
+    <div id="current-container">
+        <div>건별 데이터 
+            <button onclick="$('.current-table-con').slideToggle()">접기/펴기</button>
+            <span class="download-container"></span>
+        </div>
+        <div class="current-table-con on">
+            <table id="result-table" border="1"> </table>
+        </div>
+    </div><hr>
+    <div id="current-container">
+        <div>일별 데이터 
+            <button onclick="$('.current-table-con2').slideToggle()">접기/펴기</button>
+            <span class="download-container"></span>
+        </div>
+        <div class="current-table-con2 on">
+            <table id="day-result-table" border="1"> </table>
+        </div>
+    </div><hr>
     <script>
         // 한국수출입은행 api키 5gctN1ILEdvWKyo346cEErGbip6it8PU
         // https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=5gctN1ILEdvWKyo346cEErGbip6it8PU&searchdate=20210102&data=AP01
@@ -74,15 +93,197 @@
             addResult(json,store);
 
             // result 그리기
-            setDateData()
-        }
-        function setDateData(){
-            for (var i = 0 ; i < sales_result.length ; i++) {
+            getExchange(0,function(){
+                // 불필요한 환율 버리기
+                for(var i=0;i<Object.keys(환율).length;i++){
+                    var row=환율[Object.keys(환율)[i]];
+                    var temp={}
+                    for(var j=0;j<row.length;j++){
+                        if(row[j].cur_unit=="USD")temp.usd=row[j]
+                        if(row[j].cur_unit=="CNH")temp.cnh=row[j]
+                        if(temp.usd!=null && temp.chn!=null){
+                            break;
+                        }
+                    }
+                    console.log(`환율[${Object.keys(환율)[i]}] : `,row);
+                    console.log(`temp : `,temp);
+                    환율[Object.keys(환율)[i]]=temp;
+                }
+                
+            	for(var i=0;i<sales_result.length;i++){
+            	    // 1. 구매대행 원가/ 출고비용 계산 (사입은 이미했음)
+                    var row=sales_result[i]
+                    if(mallProductCode[row["품목"]].type=="구매대행"){
+                        var date=row["발주일자"].substr(0,8)
 
-            }
+                        var 원가=0;
+                        if(row["해외화폐(위안)"]!=0){
+                            // row["bkpr"]=(Number(환율[date].cnh.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            // row["deal_bas_r"]=(Number(환율[date].cnh.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            // row["kftc_bkpr"]=(Number(환율[date].cnh.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            // row["kftc_deal_bas_r"]=(Number(환율[date].cnh.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            // row["ttb"]=(Number(환율[date].cnh.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            // row["tts"]=(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                            원가+=Math.round(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]);
+                        }else if(row["해외화폐(달러)"]!=0){
+                            // row["bkpr"]=(Number(환율[date].usd.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            // row["deal_bas_r"]=(Number(환율[date].usd.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            // row["kftc_bkpr"]=(Number(환율[date].usd.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            // row["kftc_deal_bas_r"]=(Number(환율[date].usd.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            // row["ttb"]=(Number(환율[date].usd.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            // row["tts"]=(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                            원가+=Math.round(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]);
+                        }
+                        console.log("구매대행 row:",row)
+                        row["원가"]=원가
+                    }
+
+                    // 2. 수익금 계산
+                    row["수익금"]=row["정산금액"]+row["배송비정산금액"]-row["원가"]-row["출고비용"]-row["국제배송비"]
+                }
+
+                // 3. 일일 수익금 계산
+                for(var i=0;i<sales_result.length;i++) {
+                    var row=sales_result[i];
+                    var date=row["주문일자"].substr(0,10)
+                    if(date_data[date]==null){
+                        date_data[date]={
+                            date:date,
+                            스토어결제금액:0,
+                            정산금액:0,
+                            고객결제배송비:0,
+                            배송비정산금액:0,
+                            사입_원가:0,
+                            사입_출고비용:0,
+                            사입_수익금:0,
+                            구매대행_구매금액:0,
+                            구매대행_국제배송비:0,
+                            구매대행_수익금:0,
+                            일매출:0,
+                            일순이익:0,
+                        }
+                    }
+                    console.log(`
+==========================================================
+    [${row["품목"]}:${row["옵션"]}]
+        상품결제금액:${row["상품결제금액"]}
+        정산금액:${row["정산금액"]}
+        고객결제배송비:${row["고객결제배송비"]}
+        배송비정산금액:${row["배송비정산금액"]}
+        수익금:${row["수익금"]}
+        원가:${row["원가"]}
+        출고비용:${row["출고비용"]}
+        수익금:${row["수익금"]}
+        국제배송비:${row["국제배송비"]}
+                    `)
+                    date_data[date].스토어결제금액+=row["상품결제금액"];
+                    date_data[date].정산금액+=row["정산금액"];
+                    date_data[date].고객결제배송비+=row["고객결제배송비"];
+                    date_data[date].배송비정산금액+=row["배송비정산금액"];
+                    if(mallProductCode[row["품목"]].type!="구매대행"){
+                        date_data[date].사입_원가+=row["원가"];
+                        date_data[date].사입_출고비용+=row["출고비용"];
+                        date_data[date].사입_수익금+=row["수익금"];
+                    }else{
+                        date_data[date].구매대행_구매금액+=row["원가"];
+                        date_data[date].구매대행_국제배송비+=row["국제배송비"];
+                        date_data[date].구매대행_수익금+=row["수익금"];
+                    }
+                    date_data[date].일매출+=row["상품결제금액"]+row["고객결제배송비"];
+                    date_data[date].일순이익+=row["수익금"];
+                    console.log(`
+        date_data[${date}].스토어결제금액:${date_data[date].스토어결제금액}
+        date_data[${date}].정산금액:${date_data[date].정산금액}
+        date_data[${date}].고객결제배송비:${date_data[date].고객결제배송비}
+        date_data[${date}].배송비정산금액:${date_data[date].배송비정산금액}
+        date_data[${date}].사입_원가:${date_data[date].사입_원가}
+        date_data[${date}].사입_출고비용:${date_data[date].사입_출고비용}
+        date_data[${date}].사입_수익금:${date_data[date].사입_수익금}
+        date_data[${date}].구매대행_구매금액:${date_data[date].구매대행_구매금액}
+        date_data[${date}].구매대행_국제배송비:${date_data[date].구매대행_국제배송비}
+        date_data[${date}].구매대행_수익금:${date_data[date].구매대행_수익금}
+        date_data[${date}].일순이익:${date_data[date].일순이익}
+==========================================================
+                    `)
+                }
+                for(var i=0;i<Object.keys(date_data).length;i++){
+                    var row=date_data[Object.keys(date_data)[i]];
+                    row.일마진=(row.일순이익/row.일매출*100).toFixed(2);
+                    date_data_list.push(row);
+                }
+
+                buildHtmlTable("result-table",sales_result,true);
+                buildHtmlTable("day-result-table",date_data_list,true);
+            })
+        }
+        function setExchange(dateString,cb){
+        	if(환율[dateString]!=null&& 환율[dateString].length!=0){
+        		cb();
+        	}else{
+            	$.post('https://www.koreaexim.go.kr/site/program/financial/exchangeJSON',
+                        {authkey:"5gctN1ILEdvWKyo346cEErGbip6it8PU",searchdate : dateString,data:"AP01"},
+                        function(res){
+                        	if(res.length==0){
+                        		setWeekendExchange(dateString,function(){
+                        			 cb();
+                        		})
+                        	}else{
+	                        	 환율[dateString]=res;
+	                           	 cb();
+                        	}
+                    })
+        	}
+        }
+        // []인 경우 사용. dateString의 전날데이터를  dateString에 붙임, 전날이 null이면 구해서붙임
+        function setWeekendExchange(dateString,cb){
+        	var yesterday=moment(dateString).add(-1,'d').format('YYYYMMDD');
+        	
+        	if(환율[yesterday]==null){
+        		setExchange(yesterday,function(){
+        			환율[dateString]=환율[yesterday]
+        			cb()
+        		})
+        	}else{
+        		if(환율[yesterday].length==0){
+        			setWeekendExchange(yesterday,function(){
+        				환율[dateString]=환율[yesterday]
+        				cb();
+        			})
+        		}else{
+        			환율[dateString]=환율[yesterday]
+            		cb()
+        		}
+        	}
+        }
+        function getExchange(i,cb){
+        	if(i>=sales_result.length-1){
+        		console.log("setDateDate end");
+        		cb();
+        	}else{
+        		var row=sales_result[i]
+				if(row.발주일자!=null&& row.발주일자!=""){
+					var d=row.발주일자.substr(0,8)
+	                // 해당 발주일의 환율값이 없다면 가져다놓기
+	                var date=moment(d).format('YYYYMMDD')
+	                console.log("d:",d,"\ndate:",date);
+	                if(date!="Invalid date"&& 환율[date]==null){
+	                	setExchange(date,function(res){
+         					getExchange(++i,cb)
+	                	});
+	                 	
+	                 }else{
+	 					getExchange(++i,cb)
+	                	 
+	                 }
+				}else{
+					getExchange(++i,cb)
+				}
+        	}
         }
 sales_result=[]
+date_data_list=[]
 date_data={}
+bundle_order={}
 invalidMemo=[]
 발주번호={}
 function addResult(json,store){console.log(json,store)
@@ -108,11 +309,14 @@ function addResult(json,store){console.log(json,store)
             "품목":"", //밑에서 채움
             "옵션":row["옵션"],
             "수량":row["주문수량"],
+            "타입":"",
             "구매자":row["주문자명"],
-            "개인통관번호":row["개인통관번호"],
             "상품결제금액":row["금액"],
             "고객결제배송비":row["배송비"],
+            "원가":row["원가"],
+            "출고비용":0,
             "정산금액":0,
+            "배송비정산금액":Math.round(row["배송비"]*0.967),
             "발주일자":"",
             "해외구매처":row["매입처"],
             "해외오더넘버":"",
@@ -126,9 +330,10 @@ function addResult(json,store){console.log(json,store)
         // 상품명 간략화 처리
         var productName=findProductName(row["쇼핑몰상품코드"]);
         newRow["품목"]=productName;
+        newRow["타입"]=mallProductCode[productName].type;
         
         // 정산 금액 계산
-        if(row["쇼핑몰"]=="스마트스토어"){
+        if(row["쇼핑몰"]=="스마트스토어"||row["쇼핑몰"]=="지마켓"){
             newRow["정산금액"]=row["공급가"];
         }else{
             var fee=getProductFee(row["쇼핑몰상품코드"],row["쇼핑몰"]);
@@ -141,12 +346,18 @@ function addResult(json,store){console.log(json,store)
         var memo=row["메모"];
         console.log("memo:"+memo);
         var memoS=memo.split("/");
-        if(memoS.length!=3){
-            var 해외오더넘버=memo;
+        if(memoS.length!=3){ // 사입
+            /* var 해외오더넘버=memo;
             newRow["해외오더넘버"]=해외오더넘버;
-            invalidMemo.push({current:i,result:sales_result.length});
-            
-        }else{
+            invalidMemo.push({current:i,result:sales_result.length}); */
+        	
+            // 버킷돌리 네이버 추가옵션도 같은 버킷돌리로 인식함. 따라서 기초상품을 등록하거나 묶음상품을 하나로 인식하도록 처리해야지 출고비용을 계산할 수 있음
+            if(bundle_order[row["묶음번호"]]==null){
+                newRow["출고비용"]=mallProductCode[productName].출고비용
+            }else{
+                newRow["출고비용"]=0
+            }
+        }else{ // 구매대행
             var 해외오더넘버=memoS[0].trim();
             var 발주일자=memoS[1].trim(); //YYYYMMDDHHmm
             발주일자=발주일자.replace(/[^\d.]/g, '');
@@ -156,15 +367,6 @@ function addResult(json,store){console.log(json,store)
             newRow["해외오더넘버"]=해외오더넘버;
             newRow["배송대행지"]=getShippingAgency(row["매입처"]);
 
-            // 해당 발주일의 환율값이 없다면 가져다놓기
-            var date=moment(발주일자).format('YYYYMMDD')
-            if(환율[date]==null){
-                $.post('https://www.koreaexim.go.kr/site/program/financial/exchangeJSON',
-                    {authkey:"5gctN1ILEdvWKyo346cEErGbip6it8PU",searchdate:date,data:"AP01"},
-                    function(res){
-                        환율[date]=res;
-                    })
-             }
             
 
             // 달러면 달러컬럼에, 위안화면 위안화컬럼에 추가
@@ -172,7 +374,7 @@ function addResult(json,store){console.log(json,store)
             if(paymentCurrency=="달러"){
                 newRow["해외화폐(달러)"]=구매금액;
             }else if(paymentCurrency=="위안"){
-                newRow["해외화폐(위안)"]=구매금액;
+                newRow["해외화폐(위안)"]=(구매금액*1.03).toFixed(2);
             }
 
             // 동일주문 체크를 위한 발주번호 키 정리
@@ -191,10 +393,19 @@ function addResult(json,store){console.log(json,store)
 
             // 국제배송비
             if(productName=="전기종 짱구케이스" || productName=="A시리즈 짱구케이스"){
-                newRow["국제배송비"]=4500
+                if(bundle_order[row["묶음번호"]]==null){
+                    newRow["국제배송비"]=4500
+                }else{
+                    newRow["국제배송비"]=0
+                }
             }
         }
-
+        console.log("bundle_order[row[묶음번호]]",bundle_order[row["묶음번호"]])
+        console.log("row[묶음번호]",row["묶음번호"])
+        if(bundle_order[row["묶음번호"]]==null){
+            bundle_order[row["묶음번호"]]=[]
+        }
+        bundle_order[row["묶음번호"]].push(newRow);
         console.log("newRow:",newRow)
         sales_result.push(newRow);
     }
@@ -205,16 +416,15 @@ function addResult(json,store){console.log(json,store)
     //     var Object.keys(발주번호)
     // }
 
-    buildHtmlTable("sales-result-table",sales_result,true);
 
     // 메모이상건 있으면 alert
-    if(invalidMemo.length!=0){
+    /* if(invalidMemo.length!=0){
         alert("메모가 형식에 맞지 않는 주문건이 있습니다. 노란 배경컬럼 확인 후 처리 바랍니다.");
         for(var i=0;i<invalidMemo.length;i++){
             $($('#sales-current-table').find('tr')[invalidMemo[i].current+1]).css('background','#ffff00')
             $($('#sales-result-table').find('tr')[invalidMemo[i].result+1]).css('background','#ffff00')
         }
-    }
+    } */
 
     $('.download-container').html('<button onclick="download()">결과시트 다운로드</button>')
 }
@@ -462,7 +672,8 @@ const mallProductCode={
         fee:{
             "쿠팡":11,
         },
-        type:"사입"
+        type:"사입",
+        	출고비용:2300
     },
 
     "버킷돌리":{
@@ -477,7 +688,8 @@ const mallProductCode={
             "인터파크":13,
             "롯데ON":13,
         },
-        type:"사입"
+        type:"사입",
+    	출고비용:4400
     },
     "버킷돌리(세트)":{
         product:['12978387331'],
@@ -491,7 +703,8 @@ const mallProductCode={
             "인터파크":13,
             "롯데ON":13,
         },
-        type:"사입"
+        type:"사입",
+    	출고비용:4400
     },
     "버킷돌리(추가상품)":{
         product:["6131658967"],
@@ -505,14 +718,16 @@ const mallProductCode={
             "인터파크":13,
             "롯데ON":13,
         },
-        type:"사입"
+        type:"사입",
+    	출고비용:3400
     },
     "악력기":{
         product:["13021910128"],
         fee:{
             "쿠팡":11.9,
         },
-        type:"위탁판매"
+        type:"위탁판매",
+    	출고비용:2800
     },
 }
 
