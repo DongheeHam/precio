@@ -6,7 +6,9 @@
 	<script type="text/javascript" src="https://gsl.sysoit.com/class/res/tableExport/libs/FileSaver/FileSaver.min.js"></script>
 	<script type="text/javascript" src="./xlsx.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" ></script>
-    <style>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.4/css/jquery.dataTables.min.css"/> 
+    <script src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
+   <style>
         td{white-space: nowrap;}
         th{white-space: nowrap;}
     </style>
@@ -32,7 +34,10 @@
             <span class="download-container"></span>
         </div>
         <div class="current-table-con on">
-            <table id="result-table" border="1"> </table>
+            <table border="1" id="result-table"> 
+                <thead></thead>
+                <tbody ></tbody>
+            </table>
         </div>
     </div><hr>
     <div id="current-container">
@@ -41,7 +46,37 @@
             <span class="download-container"></span>
         </div>
         <div class="current-table-con2 on">
-            <table id="day-result-table" border="1"> </table>
+            <table border="1" id="day-result-table"> 
+                <thead></thead>
+                <tbody ></tbody>
+            </table>
+            <!-- <table id="day-result-table" border="1"> </table> -->
+        </div>
+    </div><hr>
+    <div id="current-container">
+        <div>판매방식별 데이터 
+            <button onclick="$('.current-table-con3').slideToggle()">접기/펴기</button>
+            <span class="download-container"></span>
+        </div>
+        <div class="current-table-con3 on">
+            <table border="1" id="type-result-table"> 
+                <thead></thead>
+                <tbody ></tbody>
+            </table>
+            <!-- <table id="day-result-table" border="1"> </table> -->
+        </div>
+    </div><hr>
+    <div id="current-container">
+        <div>상품별 데이터 
+            <button onclick="$('.current-table-con4').slideToggle()">접기/펴기</button>
+            <span class="download-container"></span>
+        </div>
+        <div class="current-table-con4 on">
+            <table border="1" id="product-result-table"> 
+                <thead></thead>
+                <tbody ></tbody>
+            </table>
+            <!-- <table id="day-result-table" border="1"> </table> -->
         </div>
     </div><hr>
     <script>
@@ -84,6 +119,254 @@
             
             }//end. for
         }
+        function getDateCnt(){
+            var dd={}
+            for(var i=0;i<sales_result.length;i++){
+                var row=sales_result[i]
+                var date=row["주문일자"].substr(0,10)
+                if(dd[date]==null){
+                    dd[date]=1
+                }
+            }
+            return Object.keys(dd).length;
+        }
+        function setProductData(){
+            for(var i=0;i<sales_result.length;i++) {
+                var row=sales_result[i];
+                if(row["업체상품코드"]=="12978387331"){// 쿠팡 버킷돌리 세트
+                    console.log("row:",row)
+                    var base=row["기초상품명"].split(',');
+                    // if(base.length==1){
+                        
+                    // }else{
+                        for(var j=0;j<base.length;j++){
+                            var cp기초상품명="[쿠팡 버킷돌리세트] "+base[j];
+                            var cp판매수량=Number(row["건별출고수량"].split(',')[j]);
+                            if(product_data[cp기초상품명]==null){
+                                product_data[cp기초상품명]={
+                                    품목명:"쿠팡 버킷돌리세트",
+                                    기초상품명:cp기초상품명,
+                                    판매수량:cp판매수량,
+                                    결제금액:"-",
+                                    원가:"-",
+                                    윈가율:"-",
+                                    출고비용:"-",
+                                    마진금액:"-",
+                                    마진율:"-",
+                                    마진비중률:"-",
+                                }
+                            }else{
+                                product_data[cp기초상품명].판매수량+=cp판매수량
+                            }
+                        }
+                        if(product_data["[쿠팡 버킷돌리세트]"]==null){
+                            product_data["[쿠팡 버킷돌리세트]"]={
+                                품목명:"[쿠팡 버킷돌리세트]",
+                                기초상품명:"[쿠팡 버킷돌리세트]",
+                                판매수량:row["수량"],
+                                결제금액:row["상품결제금액"]+row["고객결제배송비"],
+                                원가:row["원가"],
+                                윈가율:0,
+                                출고비용:row["출고비용"]+row["국제배송비"],
+                                마진금액:row["수익금"],
+                                마진율:0,
+                                마진비중률:0,
+                            }
+                        }else{
+                            product_data["[쿠팡 버킷돌리세트]"].판매수량+=row["수량"];
+                            product_data["[쿠팡 버킷돌리세트]"].결제금액+=row["상품결제금액"]+row["고객결제배송비"];
+                            product_data["[쿠팡 버킷돌리세트]"].원가+=row["원가"];
+                            product_data["[쿠팡 버킷돌리세트]"].출고비용+=row["출고비용"]+row["국제배송비"];
+                            product_data["[쿠팡 버킷돌리세트]"].마진금액+=row["수익금"];
+                        }
+                    //}
+                }else{
+                    var option=row["기초상품명"]
+                    if(product_data[option]==null){
+                        product_data[option]={
+                            품목명:row["품목"],
+                            기초상품명:row["기초상품명"],
+                            판매수량:row["수량"],
+                            결제금액:row["상품결제금액"]+row["고객결제배송비"],
+                            원가:row["원가"],
+                            윈가율:0,
+                            출고비용:row["출고비용"]+row["국제배송비"],
+                            마진금액:row["수익금"],
+                            마진율:0,
+                            마진비중률:0,
+                        }
+                    }
+                    product_data[option].판매수량+=row["수량"];
+                    product_data[option].결제금액+=row["상품결제금액"]+row["고객결제배송비"];
+                    product_data[option].원가+=row["원가"];
+                    product_data[option].출고비용+=row["출고비용"]+row["국제배송비"];
+                    product_data[option].마진금액+=row["수익금"];
+                }
+//                 if("2004062089"==row["쇼핑몰상품코드"])console.log(`
+// ==========================================================
+// [${row["품목"]}:${row["옵션"]}]
+//     정산금액:${row["정산금액"]}
+//     배송비정산금액:${row["배송비정산금액"]}
+//     수익금:${row["수익금"]}
+//     원가:${row["원가"]}
+//     출고비용:${row["출고비용"]}
+//     국제배송비:${row["국제배송비"]}
+//                 `)
+            }
+            var 마진금액총합=0;
+            for(var i=0;i<Object.keys(product_data).length;i++){
+                var row=product_data[Object.keys(product_data)[i]];
+                if(typeof row.마진금액 =="number")
+                    마진금액총합+=row.마진금액;
+            }
+            for(var i=0;i<Object.keys(product_data).length;i++){
+                var row=product_data[Object.keys(product_data)[i]];
+                row.원가율=(row.원가/row.결제금액*100).toFixed(2);
+                row.마진율=(row.마진금액/row.결제금액*100).toFixed(2);
+                row.마진비중률=(row.마진금액/마진금액총합*100).toFixed(2);
+                product_data_list.push(row);
+            }
+        }
+        function setTypeData(){
+            var ddCnt=getDateCnt();
+            for(var i=0;i<sales_result.length;i++) {
+                var row=sales_result[i];
+                var type=row["타입"];
+                if(type_data[type]==null){
+                    type_data[type]={
+                        조회기간 : ddCnt+"일",
+                        type : type,
+                        판매수량:0,
+                        정산금액:0,
+                        지출금액:0,
+                        수익금액:0,
+                    }
+                }
+                if("2004062089"==row["쇼핑몰상품코드"])console.log(`
+==========================================================
+[${row["품목"]}:${row["옵션"]}]
+    정산금액:${row["정산금액"]}
+    배송비정산금액:${row["배송비정산금액"]}
+    수익금:${row["수익금"]}
+    원가:${row["원가"]}
+    출고비용:${row["출고비용"]}
+    국제배송비:${row["국제배송비"]}
+                `)
+                type_data[type].판매수량+=1;
+                type_data[type].정산금액+=row["정산금액"]+row["배송비정산금액"];
+                type_data[type].지출금액+=row["원가"]+row["출고비용"]+row["국제배송비"];
+                type_data[type].수익금액+=row["수익금"];
+            }
+            for(var i=0;i<Object.keys(type_data).length;i++){
+                var row=type_data[Object.keys(type_data)[i]];
+                row.순수익율=(row.수익금액/row.정산금액*100).toFixed(2);
+                type_data_list.push(row);
+            }
+        }
+        function setOrderData(){
+            for(var i=0;i<sales_result.length;i++){
+                // 1. 구매대행 원가/ 출고비용 계산 (사입은 이미했음)
+                var row=sales_result[i]
+                if(mallProductCode[row["품목"]].type=="구매대행"){
+                    var date=row["발주일자"].substr(0,8)
+
+                    var 원가=0;
+                    if(row["해외화폐(위안)"]!=0){
+                        // row["bkpr"]=(Number(환율[date].cnh.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        // row["deal_bas_r"]=(Number(환율[date].cnh.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        // row["kftc_bkpr"]=(Number(환율[date].cnh.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        // row["kftc_deal_bas_r"]=(Number(환율[date].cnh.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        // row["ttb"]=(Number(환율[date].cnh.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        // row["tts"]=(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
+                        원가+=Math.round(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]);
+                    }else if(row["해외화폐(달러)"]!=0){
+                        // row["bkpr"]=(Number(환율[date].usd.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        // row["deal_bas_r"]=(Number(환율[date].usd.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        // row["kftc_bkpr"]=(Number(환율[date].usd.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        // row["kftc_deal_bas_r"]=(Number(환율[date].usd.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        // row["ttb"]=(Number(환율[date].usd.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        // row["tts"]=(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
+                        원가+=Math.round(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]);
+                    }
+                    console.log("구매대행 row:",row)
+                    row["원가"]=원가
+                }
+
+                // 2. 수익금 계산
+                row["수익금"]=row["정산금액"]+row["배송비정산금액"]-row["원가"]-row["출고비용"]-row["국제배송비"]
+            }
+        }
+        function setDayData(){
+            // 3. 일일 수익금 계산
+            for(var i=0;i<sales_result.length;i++) {
+                var row=sales_result[i];
+                var date=row["주문일자"].substr(0,10)
+                if(date_data[date]==null){
+                    date_data[date]={
+                        date:date,
+                        스토어결제금액:0,
+                        정산금액:0,
+                        고객결제배송비:0,
+                        배송비정산금액:0,
+                        사입_원가:0,
+                        사입_출고비용:0,
+                        사입_수익금:0,
+                        구매대행_구매금액:0,
+                        구매대행_국제배송비:0,
+                        구매대행_수익금:0,
+                        일매출:0,
+                        일순이익:0,
+                    }
+                }
+                if("2004062089"==row["쇼핑몰상품코드"])console.log(`
+// ==========================================================
+// [${row["품목"]}:${row["옵션"]}]
+//     상품결제금액:${row["상품결제금액"]}
+//     정산금액:${row["정산금액"]}
+//     고객결제배송비:${row["고객결제배송비"]}
+//     배송비정산금액:${row["배송비정산금액"]}
+//     수익금:${row["수익금"]}
+//     원가:${row["원가"]}
+//     출고비용:${row["출고비용"]}
+//     수익금:${row["수익금"]}
+//     국제배송비:${row["국제배송비"]}
+//                 `)
+                date_data[date].스토어결제금액+=row["상품결제금액"];
+                date_data[date].정산금액+=row["정산금액"];
+                date_data[date].고객결제배송비+=row["고객결제배송비"];
+                date_data[date].배송비정산금액+=row["배송비정산금액"];
+                if(mallProductCode[row["품목"]].type!="구매대행"){
+                    date_data[date].사입_원가+=row["원가"];
+                    date_data[date].사입_출고비용+=row["출고비용"];
+                    date_data[date].사입_수익금+=row["수익금"];
+                }else{
+                    date_data[date].구매대행_구매금액+=row["원가"];
+                    date_data[date].구매대행_국제배송비+=row["국제배송비"];
+                    date_data[date].구매대행_수익금+=row["수익금"];
+                }
+                date_data[date].일매출+=row["상품결제금액"]+row["고객결제배송비"];
+                date_data[date].일순이익+=row["수익금"];
+//                 console.log(`
+//     date_data[${date}].스토어결제금액:${date_data[date].스토어결제금액}
+//     date_data[${date}].정산금액:${date_data[date].정산금액}
+//     date_data[${date}].고객결제배송비:${date_data[date].고객결제배송비}
+//     date_data[${date}].배송비정산금액:${date_data[date].배송비정산금액}
+//     date_data[${date}].사입_원가:${date_data[date].사입_원가}
+//     date_data[${date}].사입_출고비용:${date_data[date].사입_출고비용}
+//     date_data[${date}].사입_수익금:${date_data[date].사입_수익금}
+//     date_data[${date}].구매대행_구매금액:${date_data[date].구매대행_구매금액}
+//     date_data[${date}].구매대행_국제배송비:${date_data[date].구매대행_국제배송비}
+//     date_data[${date}].구매대행_수익금:${date_data[date].구매대행_수익금}
+//     date_data[${date}].일순이익:${date_data[date].일순이익}
+// ==========================================================
+//                 `)
+            }
+            for(var i=0;i<Object.keys(date_data).length;i++){
+                var row=date_data[Object.keys(date_data)[i]];
+                row.일마진=(row.일순이익/row.일매출*100).toFixed(2);
+                date_data_list.push(row);
+            }
+        }
         function drowCurrent(json,store){
             console.log("drowCurrent json:",json)
             // current 그리기
@@ -110,110 +393,18 @@
                     환율[Object.keys(환율)[i]]=temp;
                 }
                 
-            	for(var i=0;i<sales_result.length;i++){
-            	    // 1. 구매대행 원가/ 출고비용 계산 (사입은 이미했음)
-                    var row=sales_result[i]
-                    if(mallProductCode[row["품목"]].type=="구매대행"){
-                        var date=row["발주일자"].substr(0,8)
+            	setOrderData();
 
-                        var 원가=0;
-                        if(row["해외화폐(위안)"]!=0){
-                            // row["bkpr"]=(Number(환율[date].cnh.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            // row["deal_bas_r"]=(Number(환율[date].cnh.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            // row["kftc_bkpr"]=(Number(환율[date].cnh.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            // row["kftc_deal_bas_r"]=(Number(환율[date].cnh.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            // row["ttb"]=(Number(환율[date].cnh.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            // row["tts"]=(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]).toFixed(2);
-                            원가+=Math.round(Number(환율[date].cnh.tts.replace(/[^\d.]/g, ''))*row["해외화폐(위안)"]);
-                        }else if(row["해외화폐(달러)"]!=0){
-                            // row["bkpr"]=(Number(환율[date].usd.bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            // row["deal_bas_r"]=(Number(환율[date].usd.deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            // row["kftc_bkpr"]=(Number(환율[date].usd.kftc_bkpr.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            // row["kftc_deal_bas_r"]=(Number(환율[date].usd.kftc_deal_bas_r.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            // row["ttb"]=(Number(환율[date].usd.ttb.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            // row["tts"]=(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]).toFixed(2);
-                            원가+=Math.round(Number(환율[date].usd.tts.replace(/[^\d.]/g, ''))*row["해외화폐(달러)"]);
-                        }
-                        console.log("구매대행 row:",row)
-                        row["원가"]=원가
-                    }
+                setDayData();
 
-                    // 2. 수익금 계산
-                    row["수익금"]=row["정산금액"]+row["배송비정산금액"]-row["원가"]-row["출고비용"]-row["국제배송비"]
-                }
+                setTypeData();
 
-                // 3. 일일 수익금 계산
-                for(var i=0;i<sales_result.length;i++) {
-                    var row=sales_result[i];
-                    var date=row["주문일자"].substr(0,10)
-                    if(date_data[date]==null){
-                        date_data[date]={
-                            date:date,
-                            스토어결제금액:0,
-                            정산금액:0,
-                            고객결제배송비:0,
-                            배송비정산금액:0,
-                            사입_원가:0,
-                            사입_출고비용:0,
-                            사입_수익금:0,
-                            구매대행_구매금액:0,
-                            구매대행_국제배송비:0,
-                            구매대행_수익금:0,
-                            일매출:0,
-                            일순이익:0,
-                        }
-                    }
-                    console.log(`
-==========================================================
-    [${row["품목"]}:${row["옵션"]}]
-        상품결제금액:${row["상품결제금액"]}
-        정산금액:${row["정산금액"]}
-        고객결제배송비:${row["고객결제배송비"]}
-        배송비정산금액:${row["배송비정산금액"]}
-        수익금:${row["수익금"]}
-        원가:${row["원가"]}
-        출고비용:${row["출고비용"]}
-        수익금:${row["수익금"]}
-        국제배송비:${row["국제배송비"]}
-                    `)
-                    date_data[date].스토어결제금액+=row["상품결제금액"];
-                    date_data[date].정산금액+=row["정산금액"];
-                    date_data[date].고객결제배송비+=row["고객결제배송비"];
-                    date_data[date].배송비정산금액+=row["배송비정산금액"];
-                    if(mallProductCode[row["품목"]].type!="구매대행"){
-                        date_data[date].사입_원가+=row["원가"];
-                        date_data[date].사입_출고비용+=row["출고비용"];
-                        date_data[date].사입_수익금+=row["수익금"];
-                    }else{
-                        date_data[date].구매대행_구매금액+=row["원가"];
-                        date_data[date].구매대행_국제배송비+=row["국제배송비"];
-                        date_data[date].구매대행_수익금+=row["수익금"];
-                    }
-                    date_data[date].일매출+=row["상품결제금액"]+row["고객결제배송비"];
-                    date_data[date].일순이익+=row["수익금"];
-                    console.log(`
-        date_data[${date}].스토어결제금액:${date_data[date].스토어결제금액}
-        date_data[${date}].정산금액:${date_data[date].정산금액}
-        date_data[${date}].고객결제배송비:${date_data[date].고객결제배송비}
-        date_data[${date}].배송비정산금액:${date_data[date].배송비정산금액}
-        date_data[${date}].사입_원가:${date_data[date].사입_원가}
-        date_data[${date}].사입_출고비용:${date_data[date].사입_출고비용}
-        date_data[${date}].사입_수익금:${date_data[date].사입_수익금}
-        date_data[${date}].구매대행_구매금액:${date_data[date].구매대행_구매금액}
-        date_data[${date}].구매대행_국제배송비:${date_data[date].구매대행_국제배송비}
-        date_data[${date}].구매대행_수익금:${date_data[date].구매대행_수익금}
-        date_data[${date}].일순이익:${date_data[date].일순이익}
-==========================================================
-                    `)
-                }
-                for(var i=0;i<Object.keys(date_data).length;i++){
-                    var row=date_data[Object.keys(date_data)[i]];
-                    row.일마진=(row.일순이익/row.일매출*100).toFixed(2);
-                    date_data_list.push(row);
-                }
+                setProductData();
 
                 buildHtmlTable("result-table",sales_result,true);
-                buildHtmlTable("day-result-table",date_data_list,true);
+               buildHtmlTable("day-result-table",date_data_list,true);
+               buildHtmlTable("type-result-table",type_data_list,true);
+               buildHtmlTable("product-result-table",product_data_list,true);
             })
         }
         function setExchange(dateString,cb){
@@ -231,6 +422,8 @@
 	                        	 환율[dateString]=res;
 	                           	 cb();
                         	}
+                    }).fail(function(r,r2,r3){
+                        if(r2=="error") alert("환율정보를 받아오는데 실패했습니다. CORS설정을 확인하세요.")
                     })
         	}
         }
@@ -280,9 +473,13 @@
 				}
         	}
         }
-sales_result=[]
-date_data_list=[]
-date_data={}
+sales_result=[] // 건별데이터(총괄데이터)
+product_data={} // 상품별 데이터 작업용
+product_data_list=[] // 상품별 데이터
+type_data={} // 판매방식별 데이터 작업용
+type_data_list=[] //판매방식별 데이터
+date_data_list=[] // 일자별데이터
+date_data={} // 일자별 데이터 작업용
 bundle_order={} // 고객이 내 스토어에서 주문한 주문의 묶음번호
 invalidMemo=[]
 발주번호={} // 구매대행 결제한 해외 주문번호
@@ -302,6 +499,7 @@ function addResult(json,store){console.log(json,store)
         if(row["주문수량"]==0) continue;
         
         var newRow={
+            "쇼핑몰상품코드":row["쇼핑몰상품코드"],
             "주문플랫폼":row["쇼핑몰"],
             "주문일자":row["결제완료일"],
             "국내오더넘버":row["쇼핑몰주문번호"],
@@ -310,6 +508,8 @@ function addResult(json,store){console.log(json,store)
             "옵션":row["옵션"],
             "수량":row["주문수량"],
             "타입":"",
+            "기초상품명":row["기초상품명"],
+            "건별출고수량":row["건별출고수량"],
             "구매자":row["주문자명"],
             "상품결제금액":row["금액"],
             "고객결제배송비":0,
@@ -330,6 +530,14 @@ function addResult(json,store){console.log(json,store)
 
         // 상품명 간략화 처리
         var productName=findProductName(row["쇼핑몰상품코드"]);
+
+if(productName==null){
+    alert(`등록되지 않은 상품의 주문이 있습니다. 상품정보를 최신화해주세요.
+주문처 : ${row["쇼핑몰"]}
+상품명 : ${row["온라인상품명"]}
+상품번호 : ${row["쇼핑몰상품코드"]}`)
+    return;
+}
         newRow["품목"]=productName;
         newRow["타입"]=mallProductCode[productName].type;
         
@@ -353,9 +561,17 @@ function addResult(json,store){console.log(json,store)
 
 
         // 메모 => 구매대행정보 변환
+
         var memo=row["메모"];
         console.log("memo:"+memo);
         var memoS=memo.split("/");
+        
+        // 발주 안한 구매대행있으면 넘어가기
+        if(newRow["타입"]=="구매대행" && memoS.length!=3){
+            invalidMemo.push(row)
+            continue;
+        }
+        
         if(memoS.length!=3){ // 사입
             /* var 해외오더넘버=memo;
             newRow["해외오더넘버"]=해외오더넘버;
@@ -427,13 +643,19 @@ function addResult(json,store){console.log(json,store)
 
 
     // 메모이상건 있으면 alert
-    /* if(invalidMemo.length!=0){
-        alert("메모가 형식에 맞지 않는 주문건이 있습니다. 노란 배경컬럼 확인 후 처리 바랍니다.");
+    if(invalidMemo.length!=0){
+        var msg="메모가 형식에 맞지 않는 구매대행 주문건이 있습니다. 제외하고 처리되었습니다. \n\n";
         for(var i=0;i<invalidMemo.length;i++){
-            $($('#sales-current-table').find('tr')[invalidMemo[i].current+1]).css('background','#ffff00')
-            $($('#sales-result-table').find('tr')[invalidMemo[i].result+1]).css('background','#ffff00')
+            msg+=`======================================
+주문처 : ${row["쇼핑몰"]}
+주문일:${invalidMemo[i].결제완료일}
+상품명:${invalidMemo[i].온라인상품명}
+주문자명:${invalidMemo[i].주문자명}
+메모내용:${invalidMemo[i].메모}
+`
         }
-    } */
+        alert(msg);
+    }
 
     $('.download-container').html('<button onclick="download()">결과시트 다운로드</button>')
 }
@@ -451,8 +673,9 @@ function addResult(json,store){console.log(json,store)
              
              row$.append($('<td/>').html(cellValue));
          }
-         $("#"+id).append(row$);
+         $("#"+id+" tbody").append(row$);
      }
+     $('#'+id).DataTable();
  }
 
  
@@ -474,7 +697,7 @@ function addResult(json,store){console.log(json,store)
              }
          }
      }
-     isDrowHeader && $("#"+id).append(headerTr$);
+     isDrowHeader && $("#"+id+" thead").append(headerTr$);
      //console.log("columnSet:",columnSet)
      return columnSet;
  }
@@ -641,7 +864,7 @@ const mallProductCode={
         type:"구매대행"
     },
     "N 앞유리스티커":{
-        product:["5781154026"],
+        product:["5781154026","12829011126"],
         fee:{
             "쿠팡":11,
         },
@@ -686,12 +909,12 @@ const mallProductCode={
     },
 
     "버킷돌리":{
-        product:['2331466628','6043141454','8839868375'],
+        product:['2331466628','6043141454','8839868375','2004062089'],
         fee:{
             "쿠팡":11,
             "11번가":13,
             "티몬":14,
-            "위메프":4,
+            "위메프2.0":13,
             "지마켓":13,
             "옥션":13,
             "인터파크":13,
@@ -706,7 +929,7 @@ const mallProductCode={
             "쿠팡":11,
             "11번가":13,
             "티몬":14,
-            "위메프":4,
+            "위메프2.0":13,
             "지마켓":13,
             "옥션":13,
             "인터파크":13,
@@ -721,7 +944,7 @@ const mallProductCode={
             "쿠팡":11,
             "11번가":13,
             "티몬":14,
-            "위메프":4,
+            "위메프2.0":13,
             "지마켓":13,
             "옥션":13,
             "인터파크":13,
